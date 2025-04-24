@@ -1,0 +1,12 @@
+com\example\chess\model\PieceType.class
+com\example\chess\Main.class
+com\example\chess\logic\AI.class
+com\example\chess\logic\Board.class
+com\example\chess\ui\ChessBoardUI.class
+com\example\chess\logic\Board$1.class
+com\example\chess\model\Piece.class
+com\example\chess\logic\AI$Record.class
+com\example\chess\model\Move.class
+com\example\chess\model\Color.class
+com\example\chess\logic\AI$1.class
+com\example\chess\ui\ChessUI.class
