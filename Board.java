@@ -20,6 +20,7 @@ public class Board {
     				blackRookAMoved  = false,
     				blackRookHMoved  = false;
     private boolean skipCastling = false;
+    private Move lastMove = null;
     
     
     
@@ -35,7 +36,7 @@ public class Board {
                 Piece p = other.board[r][c];
                 board[r][c] = (p == null) ? null : new Piece(p.getType(), p.getColor());
             }
-            
+            this.lastMove = other.lastMove;
             this.whiteKingMoved  = other.whiteKingMoved;
             this.blackKingMoved  = other.blackKingMoved;
             this.whiteRookAMoved = other.whiteRookAMoved;
@@ -107,6 +108,17 @@ public class Board {
     	      else                             blackRookAMoved = true;
     	    }
     	  }
+    	  
+    	// ——— En Passant capture ———
+    	  if (p.getType() == PieceType.PAWN
+    	    && m.fromCol != m.toCol              // diagonal move
+    	    && board[m.toRow][m.toCol] == null)  // landing square empty
+    	  {
+    	    // the captured pawn sits one rank behind the destination
+    	    int dir = (p.getColor()==Color.WHITE ? 1 : -1);
+    	    board[m.toRow + dir][m.toCol] = null;
+    	  }
+
 
     	  // ——— 2) Update moved‐flags for any king or rook ———
     	  if (p.getType()==PieceType.KING) {
@@ -125,9 +137,19 @@ public class Board {
 
     	  // ——— 3) Actually move the king or other piece ———
     	  board[m.toRow][m.toCol]     = p;
+    	  
+
+    	// Pawn promotion:
+    	if (p.getType() == PieceType.PAWN && (m.toRow == 0 || m.toRow == 7)) {
+    	  PieceType chosen = (m.promotion != null)
+    	                      ? m.promotion
+    	                      : PieceType.QUEEN;    // fallback
+    	  board[m.toRow][m.toCol] = new Piece(chosen, p.getColor());
+    	}
+
     	  board[m.fromRow][m.fromCol] = null;
 
-    	  
+    	  lastMove = m;
     	}
 
 
@@ -157,7 +179,7 @@ public class Board {
         return false;
     }
 
-    /** True if the king of that color is under attack */
+    /** True if the king of that colour is under attack */
     public boolean isInCheck(Color color) {
         // find king location
         int kr = -1, kc = -1;
@@ -274,27 +296,65 @@ public class Board {
 
     /** Pawn moves: single, double from start, diagonal captures */
     private void pawnMoves(List<Move> moves, int r, int c, Color color) {
-        int dir = (color == Color.WHITE) ? -1 : 1;
+        int dir      = (color == Color.WHITE) ? -1 : 1;
         int startRow = (color == Color.WHITE) ? 6 : 1;
-        int nr = r + dir;
-        // forward one
+        int nr       = r + dir;
+
+        // 1) Single‐step forward (with possible promotion)
         if (inBounds(nr, c) && board[nr][c] == null) {
-            moves.add(new Move(r, c, nr, c));
-            // forward two
+            if (nr == 0 || nr == 7) {
+                // Promotion: one move for each piece type
+                for (PieceType promo : List.of(
+                        PieceType.QUEEN,
+                        PieceType.ROOK,
+                        PieceType.BISHOP,
+                        PieceType.KNIGHT)) {
+                    moves.add(new Move(r, c, nr, c, promo));
+                }
+            } else {
+                moves.add(new Move(r, c, nr, c));
+            }
+
+            // 2) Two‐square jump from start row (no promotion here)
             int nr2 = nr + dir;
             if (r == startRow && inBounds(nr2, c) && board[nr2][c] == null) {
                 moves.add(new Move(r, c, nr2, c));
             }
         }
-        // diagonal captures
+
+        // 3) Diagonal captures (with possible promotion)
         for (int dc : new int[]{-1, 1}) {
             int nc = c + dc;
-            if (inBounds(nr, nc) && board[nr][nc] != null &&
-                board[nr][nc].getColor() != color) {
-                moves.add(new Move(r, c, nr, nc));
+            if (inBounds(nr, nc) && board[nr][nc] != null
+                && board[nr][nc].getColor() != color) {
+                if (nr == 0 || nr == 7) {
+                    // Capture‐promotion
+                    for (PieceType promo : List.of(
+                            PieceType.QUEEN,
+                            PieceType.ROOK,
+                            PieceType.BISHOP,
+                            PieceType.KNIGHT)) {
+                        moves.add(new Move(r, c, nr, nc, promo));
+                    }
+                } else {
+                    moves.add(new Move(r, c, nr, nc));
+                }
+            }
+        }
+
+        // 4) En Passant
+        if (lastMove != null) {
+            Piece jumped = board[lastMove.toRow][lastMove.toCol];
+            if (jumped != null
+                && jumped.getType() == PieceType.PAWN
+                && Math.abs(lastMove.toRow - lastMove.fromRow) == 2
+                && lastMove.toRow == r
+                && Math.abs(lastMove.toCol - c) == 1) {
+                moves.add(new Move(r, c, r + dir, lastMove.toCol));
             }
         }
     }
+
 
     /** Knight: eight L‐shape jumps */
     private void knightMoves(List<Move> moves, int r, int c, Color color) {
