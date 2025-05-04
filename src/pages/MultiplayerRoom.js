@@ -1,5 +1,3 @@
-// chess-client/src/pages/MultiplayerRoom.js
-
 import React, { useState, useEffect } from "react";
 import socket from "../socket";
 import Chessboard from "chessboardjsx";
